@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>ignition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; cursor: default; }
+    canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #ui { position: fixed; inset: 0; pointer-events: none; font-family: 'Instrument Serif', Georgia, serif; color: #d9cfc2; }
+    /* words sit right of the vehicle, which the camera frames in the left third */
+    #ui > div { position: absolute; left: 24vw; right: 0; text-align: center; opacity: 0; transition: opacity 1.4s ease; white-space: nowrap; }
+    #title { bottom: 25vh; font-size: clamp(38px, 6.2vw, 92px); letter-spacing: 0.42em; padding-left: 0.42em; color: rgba(220, 208, 192, 0.55); }
+    #hint { bottom: 5.4vh; font-size: clamp(12px, 1.05vw, 16px); letter-spacing: 0.22em; padding-left: 0.22em; color: rgba(220, 208, 192, 0.42); }
+    /* the session length, before launch:  −  25  +  over 'minutes of focus' (click, scroll over it, or ← →) */
+    #length { bottom: 10.5vh; color: rgba(226, 216, 200, 0.82); }
+    #length.live { pointer-events: auto; }
+    #length .row { display: inline-flex; align-items: center; justify-content: center; gap: 0.2em; }
+    #length .val { display: inline-block; min-width: 2.4em; font-size: clamp(34px, 3.4vw, 56px); letter-spacing: 0.04em; font-variant-numeric: tabular-nums lining-nums; text-align: center; line-height: 1; }
+    #length .arrow { display: inline-block; font-size: clamp(26px, 2.4vw, 38px); line-height: 1; padding: 10px 18px; cursor: pointer; color: rgba(226, 216, 200, 0.5); transition: color 0.3s ease, transform 0.3s ease; user-select: none; }
+    #length .arrow:hover { color: rgba(245, 236, 222, 1); }
+    #length .arrow:active { transform: scale(0.9); }
+    #length .arrow.off { color: rgba(226, 216, 200, 0.14); cursor: default; }
+    #length .cap { display: block; margin-top: 0.35em; font-size: clamp(12px, 0.95vw, 15px); letter-spacing: 0.24em; padding-left: 0.24em; color: rgba(220, 208, 192, 0.45); }
+    #msg { bottom: 25vh; font-size: clamp(17px, 1.6vw, 24px); letter-spacing: 0.16em; padding-left: 0.16em; color: rgba(220, 208, 192, 0.62); }
+    /* in the cabin the porthole is centred: the words sit low, on the dark wall below it */
+    #ui.orbit > div { left: 0; }
+    #ui.orbit #hint { bottom: 5.4vh; }
+    #confirm { position: fixed; left: 0; right: 0; bottom: 6.5vh; text-align: center; font-family: 'Instrument Serif', Georgia, serif; font-size: clamp(14px, 1.15vw, 17px); letter-spacing: 0.2em; color: rgba(220, 208, 192, 0.5); opacity: 0; transition: opacity 0.6s ease; pointer-events: none; z-index: 3; }
+    #confirm.show { opacity: 1; pointer-events: auto; }
+    #confirm span { cursor: pointer; padding: 6px 10px; transition: color 0.4s ease; }
+    #confirm span:hover { color: rgba(220, 208, 192, 0.9); }
+    #credit { position: fixed; right: 44px; bottom: 19px; font-family: 'Instrument Serif', Georgia, serif; font-size: 10.5px; letter-spacing: 0.06em; color: rgba(220, 208, 192, 0.2); opacity: 0; transition: opacity 1.4s ease; pointer-events: none; white-space: nowrap; }
+    #credit.show { opacity: 1; }
+    /* narrow screens: words centred low (below the pad / the porthole), credit above the presets */
+    @media (max-aspect-ratio: 4/5) {
+      #ui > div { left: 0; }
+      #title { bottom: 24vh; font-size: clamp(30px, 11vw, 60px); }
+      #msg { bottom: 24vh; }
+      #length { bottom: 10vh; }
+      #length .val { font-size: 44px; }
+      #hint, #release { bottom: 5vh; }
+      #credit { left: 16px; right: 60px; top: 16px; bottom: auto; white-space: normal; text-align: left; font-size: 9.5px; line-height: 1.5; }
+    }
+    #release { bottom: 12vh; font-size: clamp(14px, 1.2vw, 18px); letter-spacing: 0.3em; padding-left: 0.3em; color: rgba(255, 240, 220, 0.85); transition-duration: 0.5s; }
+    /* the countdown sits on the porthole glass; its screen position is set every frame (it drifts with the sway) */
+    #timer { position: fixed; left: 50%; top: 70%; transform: translate(-50%, -50%); font-family: 'Instrument Serif', Georgia, serif; font-size: clamp(22px, 2.3vw, 36px); letter-spacing: 0.16em; padding-left: 0.16em; color: rgba(238, 232, 222, 0.62); text-shadow: 0 0 16px rgba(0, 0, 0, 0.5), 0 0 3px rgba(0, 0, 0, 0.35), 0 0 14px rgba(190, 210, 255, 0.12); font-variant-numeric: tabular-nums lining-nums; opacity: 0; transition: opacity 1.6s ease; pointer-events: none; white-space: nowrap; will-change: left, top; }
+    /* a quiet way out, shown while the pointer moves */
+    #end { position: fixed; left: 0; right: 0; bottom: 4.5vh; text-align: center; font-family: 'Instrument Serif', Georgia, serif; font-size: clamp(13px, 1vw, 15px); letter-spacing: 0.22em; color: rgba(220, 208, 192, 0.34); opacity: 0; transition: opacity 0.9s ease, color 0.4s ease; pointer-events: none; z-index: 3; }
+    #end.show { opacity: 1; }
+    #end.show span { pointer-events: auto; cursor: pointer; padding: 8px 14px; }
+    #end span:hover { color: rgba(220, 208, 192, 0.85); }
+    #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 2; }
+    #snd { position: fixed; right: 22px; bottom: 20px; width: 9px; height: 9px; border: 1px solid rgba(220, 208, 192, 0.45); border-radius: 50%; opacity: 0.55; cursor: pointer; z-index: 3; transition: background 0.4s ease, opacity 0.4s ease; }
+    #snd.on { background: rgba(220, 208, 192, 0.85); }
+    #snd:hover { opacity: 0.95; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <div id="title">ignition</div>
+    <div id="hint">hold to ignite</div>
+    <div id="release">release</div>
+    <div id="msg"></div>
+    <div id="length"><div class="row"><span class="arrow" id="lenDown" title="shorter">−</span><span class="val" id="lenVal">25</span><span class="arrow" id="lenUp" title="longer">+</span></div><span class="cap" id="lenCap">minutes of focus</span></div>
+  </div>
+  <div id="confirm">end session?&nbsp;&nbsp;<span id="yes">yes</span><span id="no">no</span></div>
+  <div id="timer"></div>
+  <div id="end"><span id="endBtn">end session</span></div>
+  <div id="fade"></div>
+  <div id="snd" title="sound"></div>
+  <div id="credit">earth: nasa gibs — landsat weld, blue marble, black marble, modis · terrain: aws terrain tiles (srtm, gmted, etopo1)</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
