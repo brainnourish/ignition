@@ -174,7 +174,7 @@ export const CONFIG = {
     // per-scene metering profiles. base: exposure at the reference; ref: metered log2 luminance of the
     // unlit scene; strength: stops of exposure pulled per metered stop above ref; maxDrop: limit in stops
     launch: { base: 1.55, ref: -6.9, strength: 0.62, maxDrop: 4.5, highlight: 0.7, ceiling: 400 },
-    orbit: { base: 40, ref: -14.5, strength: 0.63, maxDrop: 9, highlight: 0.3, ceiling: 40 },
+    orbit: { base: 40, ref: -14.5, strength: 0.63, maxDrop: 9, highlight: 0.5, ceiling: 40 },
     adaptUp: 1.5,         // per second toward a brighter scene (~1.5s to mostly settle)
     adaptDown: 0.75,      // per second back toward the dark
     centerWeight: 0.6,
@@ -182,6 +182,7 @@ export const CONFIG = {
   },
 
   post: {
+    orbitToneMapping: 'ACES_FILMIC',   // (AGX keeps hue but washes the limb and the city lights out)
     flare: 0.0012,              // lens ghosts from the sun (relative to its HDR brightness after exposure)
     aberration: 0.00012,
     aberrationEdgeStart: 0.62,  // radial fraction where fringing begins
@@ -222,6 +223,8 @@ export const CONFIG = {
     startLat: 31.5,             // straight below the window at the cut: over the eastern Mediterranean
     startLon: 22.0,
     heading: 62,                // window heading, degrees clockwise from north (toward the Levant / Nile)
+    atmosphereScale: 2.6,       // vertical stretch of the air at constant optical depth: thicker limb bands, like the telephoto ISS photos
+    ozoneGain: 1.25,             // stronger Chappuis absorption: the deep blue band above the twilight
     sunRadius: 0.2666,          // angular radius, degrees
     sunRadiance: 1500,          // HDR radiance of the disc (a white surface at noon reads 1.0)
     bumpStrength: 0.22,         // global fallback relief (before elevation tiles arrive)

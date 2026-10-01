@@ -8,9 +8,10 @@ const OB = CONFIG.orbit, E = CONFIG.earth, CB = CONFIG.cabin;
 const DEG = Math.PI / 180;
 
 // ---- CPU copy of the atmosphere model, for the colour of the sunlight that reaches the window
-const BR = [5.802e-3, 13.558e-3, 33.1e-3], BM = 3.996e-3 + 0.444e-3, BO = [0.650e-3, 1.881e-3, 0.085e-3];
+const BR = [5.802e-3, 13.558e-3, 33.1e-3], BM = 3.996e-3 + 0.444e-3, BO = [0.650e-3, 1.881e-3, 0.085e-3].map((v) => v * CONFIG.earth.ozoneGain);
 function sunTransmittance(o, d, out) {
-  const RG = 6371, RT = 6471;
+  const K = E.atmosphereScale;   // same vertical stretch as atmoconst.glsl
+  const RG = 6371, RT = 6371 + 100 * K;
   const b = o.dot(d), L = o.length();
   // ground in the way?
   const cg = (L - RG) * (L + RG), dg = b * b - cg;
@@ -24,14 +25,15 @@ function sunTransmittance(o, d, out) {
   for (let i = 0; i < N; i++) {
     const t = t0 + (i + 0.5) * h;
     const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
-    const alt = Math.sqrt(x * x + y * y + z * z) - RG;
-    if (alt < 0) return out.set(0, 0, 0);
+    const altKm = Math.sqrt(x * x + y * y + z * z) - RG;
+    if (altKm < 0) return out.set(0, 0, 0);
+    const alt = altKm / K;
     const dr = Math.exp(-alt / 8), dz = Math.max(0, 1 - Math.abs(alt - 25) / 15);
     // same aerosol profile as atmoconst.glsl: boundary layer + thin stratospheric background
-    const sh = Math.min(1, Math.max(0, alt / 12)), dm = Math.exp(-alt / 1.2) + 0.045 * Math.exp(-Math.max(alt - 12, 0) / 7) * sh * sh * (3 - 2 * sh);
-    r += (BR[0] * dr + BM * dm + BO[0] * dz) * h;
-    g += (BR[1] * dr + BM * dm + BO[1] * dz) * h;
-    bl += (BR[2] * dr + BM * dm + BO[2] * dz) * h;
+    const sh = Math.min(1, Math.max(0, alt / 12)), dm = Math.exp(-alt / 1.2) + 0.015 * Math.exp(-Math.max(alt - 12, 0) / 7) * sh * sh * (3 - 2 * sh);
+    r += (BR[0] * dr + BM * dm + BO[0] * dz) * h / K;
+    g += (BR[1] * dr + BM * dm + BO[1] * dz) * h / K;
+    bl += (BR[2] * dr + BM * dm + BO[2] * dz) * h / K;
   }
   // never bluer than green: the pure model turns the grazing sun magenta (ozone takes the green);
   // stratospheric aerosols and refraction, which we do not model, keep the real one orange

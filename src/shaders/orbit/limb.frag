@@ -9,7 +9,7 @@ void main() {
   vec2 tg = raySphere(o, d, RG - 1.5);
   if (tg.y > 0.0) discard;         // the planet itself draws this pixel
   vec3 Tv;
-  vec3 ins = inscatter(o, d, 1e9, Tv);
+  vec3 ins = limbGrade(inscatter(o, d, 1e9, Tv));
   // night-side airglow: a faint green line ~95 km up, only visible edge-on
   vec2 ta = raySphere(o, d, RG + 95.0);
   float grazing = 0.0;

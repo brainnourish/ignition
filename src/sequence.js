@@ -86,6 +86,7 @@ export class Sequence {
       this.sound.stopMusic();
       this.post.setLayers([[this.launchScene, this.camera]]);
       this.post.setMetering(C.autoExposure.launch);
+      this.post.setToneMapping('ACES_FILMIC');
       if (window.__ign && window.__ign.resetQuality) window.__ign.resetQuality();
       this.post.setBloom(C.bloom.intensity, C.bloom.radius, C.bloom.threshold);
       this.post.resetExposure();
@@ -169,6 +170,7 @@ export class Sequence {
     this.ui.setPlace(true);
     this.post.setLayers([[this.orbit.earth.scene, this.orbit.earth.camera], [this.orbit.cabin.scene, this.camera]]);
     this.post.setMetering(C.autoExposure.orbit);
+    this.post.setToneMapping(C.post.orbitToneMapping);
     this.post.resetExposure();
     this.post.setFlash(0);
     this.post.setHeat(0.5, 0.5, 0.1, 0.1, 0);

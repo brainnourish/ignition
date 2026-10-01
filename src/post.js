@@ -246,6 +246,8 @@ export function setupPost(renderer, scene, camera, smoke) {
     // exposure compensation on top of the metered exposure (1 = neutral)
     setExposure(v) { u.get('uCompensation').value = v; },
     // metering profile: { base, ref, strength, maxDrop } (see config.autoExposure)
+    // tone mapping per scene: the launch keeps ACES; orbit uses AgX, which keeps bright blues blue
+    setToneMapping(mode) { tone.mode = ToneMappingMode[mode]; },
     setMetering(m) { u.get('uBase').value = m.base; u.get('uRef').value = m.ref; u.get('uStrength').value = m.strength; u.get('uMaxDrop').value = m.maxDrop; u.get('uCeiling').value = m.ceiling; autoExposure.adaptMat.uniforms.uHighlight.value = m.highlight; },
     resetExposure() { autoExposure.reset(); },
     readExposure() { return autoExposure.read(renderer); },

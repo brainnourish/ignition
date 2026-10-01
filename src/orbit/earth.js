@@ -37,13 +37,16 @@ export class EarthScene {
     this.sunDir = new THREE.Vector3(0, 0, -1);
     this.ready = false;
 
+    // the atmosphere's vertical stretch, shared by every shader that includes atmoconst.glsl
+    const ATMO = { ATMO_K: E.atmosphereScale.toFixed(4), OZONE_GAIN: E.ozoneGain.toFixed(4) };
+    this.atmoDefines = ATMO;
     // atmosphere LUTs, rendered once: transmittance, then multiple scattering (which reads it)
     const lutOpts = { type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping };
     this.lut = new THREE.WebGLRenderTarget(256, 64, lutOpts);
     this.msLut = new THREE.WebGLRenderTarget(32, 32, lutOpts);
     {
       const bake = (frag, target, uniforms = {}) => {
-        const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: compositeVert, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false }));
+        const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: compositeVert, fragmentShader: frag, uniforms, defines: ATMO, depthTest: false, depthWrite: false }));
         const s = new THREE.Scene(); s.add(q);
         const prev = renderer.getRenderTarget();
         renderer.setRenderTarget(target);
@@ -66,7 +69,7 @@ export class EarthScene {
 
     // ---- space + sun
     this.spaceMat = new THREE.ShaderMaterial({
-      vertexShader: spaceVert, fragmentShader: spaceFrag, side: THREE.BackSide, depthWrite: false,
+      vertexShader: spaceVert, fragmentShader: spaceFrag, side: THREE.BackSide, depthWrite: false, defines: { ...ATMO },
       uniforms: { ...shared, uSunRadius: { value: E.sunRadius * DEG }, uSunRadiance: { value: E.sunRadiance } },
     });
     const space = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48), this.spaceMat);
@@ -97,10 +100,10 @@ export class EarthScene {
 
     // ---- limb (air against space); drawn before the planet, which overwrites it where it is solid
     this.limbMat = new THREE.ShaderMaterial({
-      vertexShader: limbVert, fragmentShader: limbFrag, uniforms: { ...shared, uAirglow: { value: 0 } },
+      vertexShader: limbVert, fragmentShader: limbFrag, uniforms: { ...shared, uAirglow: { value: 0 } }, defines: { ...ATMO },
       transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
     });
-    const limb = new THREE.Mesh(new THREE.SphereGeometry(6471, 384, 192), this.limbMat);
+    const limb = new THREE.Mesh(new THREE.SphereGeometry(E.radius + 100 * E.atmosphereScale, 384, 192), this.limbMat);
     limb.position.copy(this.center);
     limb.renderOrder = 0;
     limb.frustumCulled = false;
@@ -130,12 +133,12 @@ export class EarthScene {
       uNightGlow: { value: E.nightGlow },
     };
     // the global sphere: a low-resolution fallback just under the streamed tiles (poles, offline, loading)
-    this.earth = new THREE.Mesh(new THREE.SphereGeometry(E.radius - 1.0, 512, 256), new THREE.ShaderMaterial({ vertexShader: earthVert, fragmentShader: earthFrag, uniforms: this.uniforms }));
+    this.earth = new THREE.Mesh(new THREE.SphereGeometry(E.radius - 1.0, 512, 256), new THREE.ShaderMaterial({ vertexShader: earthVert, fragmentShader: earthFrag, uniforms: this.uniforms, defines: { ...ATMO } }));
     this.earth.position.copy(this.center);
     this.earth.renderOrder = 2;   // after the tiles, so early depth rejects it wherever a tile is drawn
     this.scene.add(this.earth);
     // streamed imagery tiles (children of the planet, so they turn with it)
-    const tileMat = new THREE.ShaderMaterial({ vertexShader: earthVert, fragmentShader: earthFrag, uniforms: this.uniforms, defines: { TILE: 1 } });
+    const tileMat = new THREE.ShaderMaterial({ vertexShader: earthVert, fragmentShader: earthFrag, uniforms: this.uniforms, defines: { TILE: 1, ...ATMO } });
     this.tiles = new TiledEarth(this.earth, tileMat, renderer);
 
     this.storms = [0, 1, 2, 3].map(() => new THREE.Vector4());   // Earth-fixed dir, angular radius

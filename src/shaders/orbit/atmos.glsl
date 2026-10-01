@@ -9,6 +9,14 @@ uniform sampler2D tMultiScat;
 uniform vec3 uSunDir;
 uniform float uSunE;          // solar illuminance scale (pi = a white Lambert surface at noon reads 1.0)
 
+// The three-channel ozone absorbs green more than red, so red sunlight plus Rayleigh blue comes out
+// magenta at the limb, where real broadband absorption and a camera give blue-white. Remove only the
+// magenta part (red and blue both above green): orange and pure blue are left alone.
+vec3 limbGrade(vec3 c) {
+  float m = max(min(c.r, c.b) - c.g, 0.0);
+  return vec3(c.r - m, c.g + m * 0.45, c.b);
+}
+
 vec3 multiScat(float r, float muS) {
   return texture2D(tMultiScat, vec2(muS * 0.5 + 0.5, clamp((r - RG) / (RT - RG), 0.0, 1.0))).rgb;
 }

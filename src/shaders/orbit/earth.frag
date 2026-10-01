@@ -227,7 +227,7 @@ void main() {
   float grazing = 1.0 - smoothstep(0.12, 0.28, dot(v, n0));
   if (grazing > 0.0) {
     vec3 Tp;
-    vec3 ip = inscatter(o, d, tAir, Tp);
+    vec3 ip = limbGrade(inscatter(o, d, tAir, Tp));
     ins = mix(ins, ip, grazing);
     Tv = mix(Tv, Tp, grazing);
   }
