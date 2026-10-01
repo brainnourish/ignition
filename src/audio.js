@@ -102,6 +102,11 @@ export class Sound {
     const stops = { 1: 1.0, 2: 0.55, 3: 0.22, 4: 0.3, 6: 0.08, 8: 0.1, 10: 0.03 };
     for (const [h, a] of Object.entries(stops)) imag[Number(h)] = a;
     this.organWave = ctx.createPeriodicWave(real, imag);
+    // the pads use an airy, flute-like voice: almost all fundamental, a breath of octave
+    const fr = new Float32Array(6), fi = new Float32Array(6);
+    fi[1] = 1.0; fi[2] = 0.12; fi[3] = 0.03;
+    this.airWave = ctx.createPeriodicWave(fr, fi);
+    this.padIndex = Math.floor(Math.random() * 4);
     // a long, dark hall: generated impulse response (decaying stereo noise, highs fade first)
     const sr = ctx.sampleRate, len = Math.floor(sr * CONFIG.audio.hall);
     const ir = ctx.createBuffer(2, len, sr);
@@ -128,7 +133,7 @@ export class Sound {
   }
 
   // one organ pipe: slow swell, hold, long release (seconds from now); two ranks a few cents apart
-  _pipe(midi, start, attack, hold, release, gain) {
+  _pipe(midi, start, attack, hold, release, gain, wave = this.organWave, spread = [-3, 3.5]) {
     const ctx = this.ctx, t0 = ctx.currentTime + start;
     const f = 440 * Math.pow(2, (midi - 69) / 12);
     const env = ctx.createGain();
@@ -138,9 +143,9 @@ export class Sound {
     env.gain.linearRampToValueAtTime(0, t0 + attack + hold + release);
     env.connect(this.organIn);
     const end = t0 + attack + hold + release + 0.1;
-    for (const det of [-3, 3.5]) {
+    for (const det of spread) {
       const o = ctx.createOscillator();
-      o.setPeriodicWave(this.organWave); o.frequency.value = f; o.detune.value = det;
+      o.setPeriodicWave(wave); o.frequency.value = f; o.detune.value = det;
       o.connect(env); o.start(t0); o.stop(end);
       this.voices.add(o); o.onended = () => this.voices.delete(o);
     }
@@ -166,12 +171,23 @@ export class Sound {
     for (const [m, a] of [[33, 0.9], [40, 0.65], [45, 0.75], [48, 0.6], [52, 0.5], [59, 0.35]]) this._pipe(m, 0, attack, hold, release, g * a);
   }
 
-  // the middle of a long session: a near-subliminal open fifth, very slow
+  // the middle of a long session: a soft, airy major chord high above the hum, swelling and
+  // fading over half a minute, with a faint octave shimmer on top. The chords rotate through
+  // bright, open colours (major 9, lydian, sus2, major 7) so it never turns dark.
   pad() {
     if (!this.ctx || !this.enabled) return;
-    const roots = [38, 43, 41, 45];
-    const r = roots[Math.floor(Math.random() * roots.length)];
-    for (const m of [r, r + 7]) this._pipe(m, 0, 9, 6, 12, 0.014);
+    const chords = [
+      [60, 64, 67, 71, 74],   // C major 9
+      [65, 69, 72, 76, 83],   // F lydian (the raised fourth floats)
+      [67, 69, 74, 79, 81],   // G sus2
+      [68, 72, 75, 79, 84],   // A-flat major 7 (a warm lift)
+    ];
+    const ch = chords[this.padIndex % chords.length];
+    this.padIndex += 1 + Math.floor(Math.random() * 2);
+    const attack = 10, hold = 7, release = 15;
+    ch.forEach((m, i) => this._pipe(m, i * 0.6, attack, hold, release, 0.011 * (1 - i * 0.1), this.airWave, [-6, 0, 6]));
+    // shimmer: the top note an octave up, entering late, barely there
+    this._pipe(ch[ch.length - 1] + 12, attack * 0.8, attack, hold * 0.6, release, 0.0035, this.airWave, [-8, 8]);
   }
 
   // leaving orbit: let whatever is sounding die away quickly
