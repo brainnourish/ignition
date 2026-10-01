@@ -1,25 +1,25 @@
 // The hero clip. Two passes with the same timeline (sim seconds):
 //   video (default): exact 1/30 s steps, one screenshot per frame -> OUT/frames/%05d.png
 //   AUDIO=1:         real time, records the synthesized mix -> OUT/audio.webm
-// 0 idle · 1.2 press · 4.8 release · ~13.4 cut · cut+2 skip 3 s of night · sunrise ~cut+4 · end CLIP_END
+// 0 idle · 1.2 press · 4.8 release · ~13.4 cut · the night runs in full (no time jumps: the light must be continuous) · sunrise ~cut+7 · end
 import fs from 'node:fs';
-const PRESS = 1.2, RELEASE = 4.8, SKIP_AT = 2.0, SKIP = 3.0, END_AFTER_RISE = 9.5;
+const PRESS = 1.2, RELEASE = 4.8, END_AFTER_RISE = 9.5;
 export default async ({ ev, page }) => {
   const out = process.argv[2];
-  await page.addStyleTag({ content: '#snd, #credit, #end { display: none !important; } body { cursor: none; }' });
+  // STILL=1: no countdown on the glass, and frames are kept only from FROM (seconds) on (for the app icon)
+  await page.addStyleTag({ content: `#snd, #credit, #end${process.env.STILL ? ', #timer' : ''} { display: none !important; } body { cursor: none; }` });
   await page.waitForFunction(() => window.__ign.seq.orbit.ready, null, { timeout: 60000 });
   // a 25 minute session (shows 25:00 on the glass at sunrise)
   await ev(() => { const u = window.__ign.ui; while (u.minutes < 25) u.step(1); while (u.minutes > 25) u.step(-1); });
   await page.keyboard.press('Shift');   // first gesture: starts the audio
   const audio = !!process.env.AUDIO;
   // the shared timeline, driven from simulated time
-  const state = { pressed: false, released: false, skipped: false, cut: null, rise: null };
+  const state = { pressed: false, released: false, cut: null, rise: null };
   const step = async (simT) => {
     const g = await ev(() => ({ inOrbit: window.__ign.seq.inOrbit, started: window.__ign.seq.sessionStarted }));
     if (!state.pressed && simT >= PRESS) { state.pressed = true; await ev(() => window.__ign.seq.press()); }
     if (!state.released && simT >= RELEASE) { state.released = true; await ev(() => window.__ign.seq.release()); }
     if (g.inOrbit && state.cut === null) state.cut = simT;
-    if (state.cut !== null && !state.skipped && simT >= state.cut + SKIP_AT) { state.skipped = true; await ev((s) => { window.__ign.seq.orbitStart -= s; }, SKIP); }
     if (g.started && state.rise === null) state.rise = simT;
     return state.rise !== null && simT >= state.rise + END_AFTER_RISE;
   };
@@ -32,7 +32,7 @@ export default async ({ ev, page }) => {
       await ev(() => { window.__ign.steps = 1; });
       await page.waitForFunction(() => window.__ign.steps === 0);
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
-      await page.screenshot({ path: `${out}/frames/${String(f).padStart(5, '0')}.png` });
+      if (simT >= Number(process.env.FROM || 0)) await page.screenshot({ path: `${out}/frames/${String(f).padStart(5, '0')}.png` });
       if (f % 60 === 0) console.log('frame', f, 'sim', simT.toFixed(1), JSON.stringify(state));
     }
   } else {

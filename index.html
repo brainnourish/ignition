@@ -3,10 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
   <title>ignition</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet" />
   <style>
     html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
     body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; cursor: default; }
@@ -34,7 +37,7 @@
     #confirm.show { opacity: 1; pointer-events: auto; }
     #confirm span { cursor: pointer; padding: 6px 10px; transition: color 0.4s ease; }
     #confirm span:hover { color: rgba(220, 208, 192, 0.9); }
-    #credit { position: fixed; right: 44px; bottom: 19px; font-family: 'Instrument Serif', Georgia, serif; font-size: 10.5px; letter-spacing: 0.06em; color: rgba(220, 208, 192, 0.2); opacity: 0; transition: opacity 1.4s ease; pointer-events: none; white-space: nowrap; }
+    #credit { position: fixed; right: calc(44px + env(safe-area-inset-right)); bottom: calc(19px + env(safe-area-inset-bottom)); font-family: 'Instrument Serif', Georgia, serif; font-size: 10.5px; letter-spacing: 0.06em; color: rgba(220, 208, 192, 0.2); opacity: 0; transition: opacity 1.4s ease; pointer-events: none; white-space: nowrap; }
     #credit.show { opacity: 1; }
     /* narrow screens: words centred low (below the pad / the porthole), credit above the presets */
     @media (max-aspect-ratio: 4/5) {
@@ -44,7 +47,7 @@
       #length { bottom: 10vh; }
       #length .val { font-size: 44px; }
       #hint, #release { bottom: 5vh; }
-      #credit { left: 16px; right: 60px; top: 16px; bottom: auto; white-space: normal; text-align: left; font-size: 9.5px; line-height: 1.5; }
+      #credit { left: 16px; right: 60px; top: calc(16px + env(safe-area-inset-top)); bottom: auto; white-space: normal; text-align: left; font-size: 9.5px; line-height: 1.5; }
     }
     #release { bottom: 12vh; font-size: clamp(14px, 1.2vw, 18px); letter-spacing: 0.3em; padding-left: 0.3em; color: rgba(255, 240, 220, 0.85); transition-duration: 0.5s; }
     /* the countdown sits on the porthole glass; its screen position is set every frame (it drifts with the sway) */
@@ -55,7 +58,7 @@
     #end.show span { pointer-events: auto; cursor: pointer; padding: 8px 14px; }
     #end span:hover { color: rgba(220, 208, 192, 0.85); }
     #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 2; }
-    #snd { position: fixed; right: 22px; bottom: 20px; width: 9px; height: 9px; border: 1px solid rgba(220, 208, 192, 0.45); border-radius: 50%; opacity: 0.55; cursor: pointer; z-index: 3; transition: background 0.4s ease, opacity 0.4s ease; }
+    #snd { position: fixed; right: calc(22px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); width: 9px; height: 9px; border: 1px solid rgba(220, 208, 192, 0.45); border-radius: 50%; opacity: 0.55; cursor: pointer; z-index: 3; transition: background 0.4s ease, opacity 0.4s ease; }
     #snd.on { background: rgba(220, 208, 192, 0.85); }
     #snd:hover { opacity: 0.95; }
   </style>

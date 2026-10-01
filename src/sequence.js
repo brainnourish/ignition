@@ -5,6 +5,7 @@ import { Plume } from './plume.js';
 import { Orbit } from './orbit/orbit.js';
 import { now } from './session.js';
 import { loadMinutes, formatClock } from './ui.js';
+import { tap, sessionBegin, sessionMoved, sessionFinish, appHidden, appVisible, askForReminders } from './native.js';
 
 const C = CONFIG;
 const OB = C.orbit;
@@ -67,6 +68,7 @@ export class Sequence {
       if (this.state !== 'idle') this.resetPad();
       this.state = 'hold';
       this.holdT = 0;
+      this.readyTapped = false;
     }
   }
 
@@ -81,6 +83,7 @@ export class Sequence {
 
   resetPad() {
     if (this.inOrbit) {
+      sessionFinish();
       this.orbit.exit();
       this.sound.setHum(0);
       this.sound.stopMusic();
@@ -148,6 +151,7 @@ export class Sequence {
     this.flightT = 0;
     this.flash = 1;
     this.sound.thump(1);
+    tap('heavy');
     this.ui.hideAll();
   }
 
@@ -163,6 +167,7 @@ export class Sequence {
     this.post.resetSmokeHistory();
     this.orbitStart = now();
     this.sessionEnd = OB.nightOpen + this.focusMinutes * 60;   // seconds after the cut: the sunset
+    sessionBegin(Date.now() + this.sessionEnd * 1000);
     this.leaves = 0;
     this.away = false;
     this.orbit.enter(this.focusMinutes * 60);
@@ -198,8 +203,10 @@ export class Sequence {
   // page visibility: a leave counts only while the session is running
   onHidden() {
     if (this.inSession && !this.away) { this.away = true; this.leaves++; }
+    appHidden();
   }
   onVisible() {
+    appVisible();
     if (this.away) { this.away = false; this.orbit.flicker(); }
   }
 
@@ -217,10 +224,12 @@ export class Sequence {
       // still night: nothing to set, go straight to the end
       this.sessionEnd = t;
       this.orbit.early = { t0: t, h0: this.orbit.sunHeight(t, this.focusMinutes * 60), az0: OB.riseAzimuth };
+      sessionMoved(Date.now());
       return;
     }
     if (this.sessionEnd - t <= OB.earlySet) return;   // the sun is already on its way down
     this.sessionEnd = this.orbit.endEarly(t);
+    sessionMoved(Date.now() + this.remaining() * 1000);
   }
 
   // the tab title, driven by a worker tick so it keeps counting while the tab is hidden
@@ -258,6 +267,7 @@ export class Sequence {
         this.ui.hideConfirm();
         this.ui.hideEnd();
         this.sound.endTone && this.sound.endTone();
+        sessionFinish();
       }
     }
     if (this.state === 'orbitEnd') {
@@ -265,6 +275,7 @@ export class Sequence {
       if (t > this.sessionEnd + OB.settleAfterSunset) {
         this.state = 'ended';
         this.ui.ended(this.leaves);
+        askForReminders();
         this.tickTitle();
       }
     }
@@ -384,7 +395,7 @@ export class Sequence {
       for (let i = 0; i < 4; i++) this.power[i] = sstep(H.engineIgnite[i], H.engineIgnite[i] + H.igniteRamp, t);
       const avg = (this.power[0] + this.power[1] + this.power[2] + this.power[3]) / 4;
       this.emitEruption(dt, SM.eruptionRate * 0.55 * avg);
-      if (t >= H.duration) this.ui.showRelease();
+      if (t >= H.duration) { this.ui.showRelease(); if (!this.readyTapped) { this.readyTapped = true; tap('light'); } }
       this.sound.setRumble(Math.pow(holdP, 1.4) * 0.9);
       this.sound.setRoar(avg * 0.85, 700 + avg * 600);
       this.sound.crackle(sparkRate * 0.05, dt, 1);

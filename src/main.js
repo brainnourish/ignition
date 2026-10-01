@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import '@fontsource/instrument-serif/latin-400.css';   // bundled: works offline and in the app
 import { CONFIG } from './config.js';
 import { buildScene } from './scene.js';
 import { SmokeSystem } from './smoke.js';
@@ -11,6 +12,7 @@ import { Sequence } from './sequence.js';
 import { WetGround } from './reflector.js';
 import { startTicker } from './session.js';
 import { fovFor } from './util.js';
+import { initNative } from './native.js';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true });
@@ -59,7 +61,8 @@ const isSoundToggle = (e) => e.target && e.target.id === 'snd';
 window.addEventListener('pointerdown', (e) => { if (isSoundToggle(e)) return; if (e.button !== undefined && e.button !== 0) return; seq.press(); });
 window.addEventListener('pointerup', () => seq.release());
 // during a session, moving the pointer reveals a quiet 'end session'
-window.addEventListener('pointermove', () => { if (seq.inSession) ui.pokeEnd(true); });
+// 'end session' shows on pointer movement, and on a tap (touch screens have no hover)
+for (const ev of ['pointermove', 'pointerdown']) window.addEventListener(ev, () => { if (seq.inSession) ui.pokeEnd(true); });
 window.addEventListener('pointercancel', () => seq.release());
 window.addEventListener('blur', () => seq.release());
 window.addEventListener('keydown', (e) => {
@@ -84,6 +87,7 @@ for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListen
 document.addEventListener('visibilitychange', () => { if (document.hidden) seq.onHidden(); else seq.onVisible(); });
 // the tab title keeps counting down even while the tab is in the background
 startTicker(() => seq.tickTitle());
+initNative();
 
 // ---------- loop with frame-time watchdog
 const clock = new THREE.Clock();

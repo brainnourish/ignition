@@ -14,9 +14,23 @@ npm run build    # static files in dist/
 
 The window streams imagery from NASA GIBS and elevation from AWS Terrain Tiles over the network; offline, it falls back to the bundled global textures in `public/textures/`.
 
+## The app (iOS and Android)
+
+The same build ships as a native app through [Capacitor](https://capacitorjs.com): the web bundle is packaged inside the app (it does not load the website), and `src/native.js` adds what the browser cannot do. The status bar and home indicator are hidden, the screen stays awake during a session, there's a haptic tick at full power and a heavy one at ignition, and a "your ascent is complete" notification arrives at sunset if you leave the app mid-session. Notification permission is asked once, after the first finished session. On the web every native call is a no-op.
+
+```bash
+npm run ios        # build, copy into ios/, open Xcode
+npm run android    # build, copy into android/, open Android Studio
+```
+
+- iOS: in Xcode pick your team under Signing & Capabilities (bundle id `com.garnerhall.ignition`), then Product → Archive → Distribute to App Store Connect / TestFlight. Needs Xcode and an Apple Developer account.
+- Android: needs JDK 21 (Android Studio's bundled one works). Build → Generate Signed App Bundle for Google Play, or `cd android && ./gradlew bundleRelease` once a release key is set up.
+- Icons and splash come from `resources/` (`icon.png` is a sunrise through the porthole, rendered with `STILL=1 FROM=24.5 node tools/shots.mjs media/icon hero`); regenerate with `npx @capacitor/assets generate --assetPath resources`.
+
 ## Layout
 
 - `src/config.js` — every tunable, plus the lighter mobile profile at the bottom.
+- `src/native.js` — the app shell hooks (haptics, keep-awake, the sunset notification); no-ops on the web.
 - `src/main.js` — renderer, loop, resize (portrait-aware field of view), adaptive quality (smoke first on the pad, resolution first in orbit).
 - `src/sequence.js` — the state machine: hold, abort, ignition, liftoff, the cut, the focus session, the ending.
 - **Launch**: `scene.js` (pad, tower, rocket), `plume.js`, `smoke.js` (instanced smoke, self-shadowed through a density grid, lit per pixel by direction to the fire), `sparks.js`, `reflector.js` (planar reflection for the wet concrete), `camera.js`.
