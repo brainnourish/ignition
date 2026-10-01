@@ -296,6 +296,9 @@ export const CONFIG = {
     thump: 0.45,      // the ignition thump
     hum: 0.05,        // cabin air and drone
     tone: 0.6,        // the soft tone at the end
+    music: 0.9,       // the organ at sunrise and sunset (the chords are already quiet)
+    hall: 7.0,        // seconds of reverb tail
+    padEvery: [180, 300],   // seconds between the faint pads in long sessions
   },
 
   quality: {

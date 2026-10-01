@@ -83,6 +83,7 @@ export class Sequence {
     if (this.inOrbit) {
       this.orbit.exit();
       this.sound.setHum(0);
+      this.sound.stopMusic();
       this.post.setLayers([[this.launchScene, this.camera]]);
       this.post.setMetering(C.autoExposure.launch);
       if (window.__ign && window.__ign.resetQuality) window.__ign.resetQuality();
@@ -154,6 +155,7 @@ export class Sequence {
     this.inOrbit = true;
     this.flightT = 0;
     this.sessionStarted = false;
+    this.sunsetCued = false;
     this.smoke.clearDynamic();
     this.smoke.mesh.visible = false;
     if (this.wet) this.wet.enabled = false;
@@ -228,8 +230,25 @@ export class Sequence {
   updateOrbit(dt, time) {
     const t = now() - this.orbitStart;          // seconds since the cut
     const sinceRise = t - OB.nightOpen;
+    const total = this.focusMinutes * 60;
     if (this.state === 'orbit') {
-      if (sinceRise >= 0 && !this.sessionStarted && this.sessionEnd > OB.nightOpen) { this.sessionStarted = true; this.ui.showTimer(true); }
+      if (sinceRise >= 0 && !this.sessionStarted && this.sessionEnd > OB.nightOpen) {
+        this.sessionStarted = true;
+        this.ui.showTimer(true);
+        this.sound.sunriseSwell(total);   // the second ignition: the organ rises with the sun
+        this.nextPad = OB.nightOpen + 90 + C.audio.padEvery[0];
+      }
+      if (this.sessionStarted) {
+        const left = this.sessionEnd - t;
+        // the sunset chord is cued so it dies away exactly at zero (an early end cues it too)
+        const lead = Math.min(55, Math.max(8, total * 0.4));
+        if (!this.sunsetCued && left <= lead) { this.sunsetCued = true; this.sound.sunsetChord(left); }
+        // long sessions: a faint pad every few minutes, never near sunrise or sunset
+        if (total > 480 && t > this.nextPad && left > 120) {
+          this.sound.pad();
+          this.nextPad = t + C.audio.padEvery[0] + Math.random() * (C.audio.padEvery[1] - C.audio.padEvery[0]);
+        }
+      }
       if (this.sessionStarted) this.ui.setTimer(this.remaining());
       if (t >= this.sessionEnd) {
         this.state = 'orbitEnd';

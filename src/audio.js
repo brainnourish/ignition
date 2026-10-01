@@ -91,6 +91,96 @@ export class Sound {
     lfo.connect(lfoGain).connect(this.humGain.gain); lfo.start();
     this.humGain.connect(this.master);
     this.setHum(this.humTarget || 0);
+    this._initMusic();
+  }
+
+  // ---------- the score: a pipe organ in a large space, heard only at sunrise and sunset
+  _initMusic() {
+    const ctx = this.ctx;
+    // organ stops as one periodic wave: 16' (sub), 8' (unison), 4', 2 2/3', 2', 1 3/5' (very little of the top)
+    const n = 12, real = new Float32Array(n), imag = new Float32Array(n);
+    const stops = { 1: 1.0, 2: 0.55, 3: 0.22, 4: 0.3, 6: 0.08, 8: 0.1, 10: 0.03 };
+    for (const [h, a] of Object.entries(stops)) imag[Number(h)] = a;
+    this.organWave = ctx.createPeriodicWave(real, imag);
+    // a long, dark hall: generated impulse response (decaying stereo noise, highs fade first)
+    const sr = ctx.sampleRate, len = Math.floor(sr * CONFIG.audio.hall);
+    const ir = ctx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const k = 0.08 + 0.6 * Math.exp(-t / 1.4);   // the tail darkens as it decays
+        lp += ((Math.random() * 2 - 1) - lp) * k;
+        d[i] = lp * Math.exp(-t / (CONFIG.audio.hall * 0.28));
+      }
+    }
+    this.hall = ctx.createConvolver(); this.hall.buffer = ir;
+    this.musicBus = ctx.createGain(); this.musicBus.gain.value = CONFIG.audio.music;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600; tone.Q.value = 0.4;
+    const dry = ctx.createGain(); dry.gain.value = 0.35;
+    const wet = ctx.createGain(); wet.gain.value = 0.85;
+    this.organIn = tone;
+    tone.connect(dry).connect(this.musicBus);
+    tone.connect(this.hall).connect(wet).connect(this.musicBus);
+    this.musicBus.connect(this.master);
+    this.voices = new Set();
+  }
+
+  // one organ pipe: slow swell, hold, long release (seconds from now); two ranks a few cents apart
+  _pipe(midi, start, attack, hold, release, gain) {
+    const ctx = this.ctx, t0 = ctx.currentTime + start;
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t0);
+    env.gain.linearRampToValueAtTime(gain, t0 + attack);
+    env.gain.setValueAtTime(gain, t0 + attack + hold);
+    env.gain.linearRampToValueAtTime(0, t0 + attack + hold + release);
+    env.connect(this.organIn);
+    const end = t0 + attack + hold + release + 0.1;
+    for (const det of [-3, 3.5]) {
+      const o = ctx.createOscillator();
+      o.setPeriodicWave(this.organWave); o.frequency.value = f; o.detune.value = det;
+      o.connect(env); o.start(t0); o.stop(end);
+      this.voices.add(o); o.onended = () => this.voices.delete(o);
+    }
+  }
+
+  // sunrise: a warm C major (add9) rises with the sun; a high E enters as the light reaches the cabin
+  sunriseSwell(sessionSeconds) {
+    if (!this.ctx || !this.enabled) return;
+    // short sessions: the whole gesture fits well inside them
+    const span = Math.min(60, Math.max(22, sessionSeconds * 0.45));
+    const attack = Math.min(9, span * 0.3), release = span * 0.45, hold = span - attack - release;
+    const g = 0.055;
+    for (const [m, a] of [[36, 1.0], [43, 0.7], [48, 0.8], [52, 0.6], [55, 0.55], [62, 0.4]]) this._pipe(m, 0, attack, hold, release, g * a);
+    this._pipe(76, attack * 0.75, attack * 0.8, Math.max(1, hold - attack * 0.4), release, g * 0.32);
+  }
+
+  // sunset: a quieter A minor (add9), timed to fade out exactly at the timer's zero
+  sunsetChord(secondsToZero) {
+    if (!this.ctx || !this.enabled) return;
+    const total = Math.max(4, secondsToZero);
+    const attack = Math.min(10, total * 0.35), release = Math.min(14, total * 0.4), hold = Math.max(0, total - attack - release);
+    const g = 0.042;
+    for (const [m, a] of [[33, 0.9], [40, 0.65], [45, 0.75], [48, 0.6], [52, 0.5], [59, 0.35]]) this._pipe(m, 0, attack, hold, release, g * a);
+  }
+
+  // the middle of a long session: a near-subliminal open fifth, very slow
+  pad() {
+    if (!this.ctx || !this.enabled) return;
+    const roots = [38, 43, 41, 45];
+    const r = roots[Math.floor(Math.random() * roots.length)];
+    for (const m of [r, r + 7]) this._pipe(m, 0, 9, 6, 12, 0.014);
+  }
+
+  // leaving orbit: let whatever is sounding die away quickly
+  stopMusic() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.musicBus.gain.cancelScheduledValues(t);
+    this.musicBus.gain.setTargetAtTime(0, t, 0.4);
+    setTimeout(() => { for (const o of this.voices) { try { o.stop(); } catch (e) { /* already stopped */ } } this.voices.clear(); this.musicBus.gain.setTargetAtTime(CONFIG.audio.music, this.ctx.currentTime, 0.05); }, 2500);
   }
 
   // quiet cabin atmosphere (0..1)
@@ -99,19 +189,11 @@ export class Sound {
     if (this.ctx) this.humGain.gain.setTargetAtTime(clamp(v, 0, 1) * CONFIG.audio.hum, this.ctx.currentTime, 1.2);
   }
   // the end of the session: a soft open fifth, slow in, long out
+  // the end: a single soft high pipe (E), ringing out in the hall
   endTone() {
     if (!this.ctx || !this.enabled) return;
-    const t = this.ctx.currentTime;
-    for (const [f, g] of [[293.66, 0.16], [440.0, 0.1], [587.3, 0.04]]) {
-      for (const det of [-2.5, 2.5]) {
-        const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.detune.value = det;
-        const e = this.ctx.createGain();
-        e.gain.setValueAtTime(0.0001, t);
-        e.gain.exponentialRampToValueAtTime(g * CONFIG.audio.tone, t + 1.6);
-        e.gain.exponentialRampToValueAtTime(0.0001, t + 7.5);
-        o.connect(e).connect(this.master); o.start(t); o.stop(t + 7.6);
-      }
-    }
+    this._pipe(64, 0, 2.2, 1.5, 7, 0.05 * CONFIG.audio.tone);
+    this._pipe(76, 0.6, 2.5, 1.0, 8, 0.016 * CONFIG.audio.tone);
   }
   // launch levels are kept low and warm: a deep, soft roar, nothing bright or buzzy (see CONFIG.audio)
   setRumble(v) { if (this.ctx) this.rumbleGain.gain.setTargetAtTime(clamp(v, 0, 1) * CONFIG.audio.rumble, this.ctx.currentTime, 0.3); }
