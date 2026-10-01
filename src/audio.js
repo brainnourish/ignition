@@ -51,6 +51,7 @@ export class Sound {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -12; comp.ratio.value = 4; comp.attack.value = 0.01; comp.release.value = 0.25;
     this.master.connect(comp).connect(ctx.destination);
+    this.output = comp;   // the final mix (tools tap it to record clips)
     const brown = this._brownBuffer(6);
 
     const loop = () => { const s = ctx.createBufferSource(); s.buffer = brown; s.loop = true; s.start(); return s; };

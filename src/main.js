@@ -92,14 +92,16 @@ let frames = 0, accum = 0, slowStrikes = 0, fastChecks = 0;
 function frame() {
   requestAnimationFrame(frame);
   const rawDt = clock.getDelta();
+  if (window.__ign) window.__ign.frames = (window.__ign.frames || 0) + 1;
+  if (window.innerWidth === 0 || window.innerHeight === 0) return;
+  // paused (capture stepping): a frame that does not run must not advance the clock either
+  if (window.__ign && window.__ign.paused) { if (!(window.__ign.steps > 0)) return; window.__ign.steps--; }
   let dt = Math.min(rawDt, 0.05);
-  if (window.__ign && window.__ign.fixedDt) { dt = window.__ign.fixedDt; simT += dt; } else simT += dt;
+  if (window.__ign && window.__ign.fixedDt) dt = window.__ign.fixedDt;
+  simT += dt;
   if (window.__ign) window.__ign.simT = simT;
   const t = simT;
-  if (window.__ign) window.__ign.frames = (window.__ign.frames || 0) + 1;
   const start = performance.now();
-  if (window.innerWidth === 0 || window.innerHeight === 0) return;
-  if (window.__ign && window.__ign.paused) { if (!(window.__ign.steps > 0)) return; window.__ign.steps--; }
 
   seq.update(dt, t);
   smoke.update(dt);

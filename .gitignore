@@ -3,3 +3,5 @@ dist/
 .DS_Store
 # progress screenshots (regenerable with tools/shots.mjs; large)
 shots/
+# rendered clips
+media/

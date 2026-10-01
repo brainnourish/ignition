@@ -8,9 +8,10 @@ const dpr = Number(process.argv[4] || 1);
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu'] });
 const mobile = !!process.env.MOBILE;
+const [vw, vh] = (process.env.SIZE || '1440x900').split('x').map(Number);
 const page = await browser.newPage(mobile
   ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true }
-  : { viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr });
+  : { viewport: { width: vw, height: vh }, deviceScaleFactor: dpr });
 page.on('console', (m) => { if (m.type() === 'error') console.log('console:', m.text().slice(0, 400)); });
 page.on('pageerror', (e) => console.log('pageerror:', e.message));
 await new Promise((r) => setTimeout(r, 3500)); // let vite settle after edits
